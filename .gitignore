@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+frontend/dist/
+backend/dist/
+*.js.map
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Scraper data (se genera dinámicamente, no hace falta versionar)
+cssbuy_orders_data.js
+cssbuy_orders.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local data
+cssbuy_data/

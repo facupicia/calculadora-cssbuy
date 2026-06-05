@@ -1,0 +1,35 @@
+{
+  "orders": [
+    {
+      "oid": "20262233",
+      "producto": "Trendy Foreign Trade Brand Mixed Emotion New Letter Embroidery Rhinestone Loose Shorts Unisex Couple Short-Sleeve T-Shirt",
+      "imagen": "https://cbu01.alicdn.com/img/ibank/O1CN01kXzOpN1aNEpBb1gbr_!!2214795683317-0-cib.jpg",
+      "url": "https://detail.1688.com/offer/948710599928.html&sku=Color:Em41 apricot color;Size:XL;&sku_id=5874043661804",
+      "vendedor": "BBBMeul3U12zARrZIfYL7GQQw",
+      "variante": "Color:Em41 apricot color;Size:XL",
+      "precio_unitario_cny": 60.0,
+      "envio_local_cny": 5.0,
+      "envio_china_cny": 0.0,
+      "cantidad": 1,
+      "estado": "Ordered",
+      "tracking": "79009306177948",
+      "fecha_pedido": 1780504838
+    },
+    {
+      "oid": "20262214",
+      "producto": "Vale Forever Direct Spray Horse Wash Distressed Hot Diamond Letters Loose Casual Men&#039;s and Women&#039;s Round Neck Short-Sleeved T-Shirt",
+      "imagen": "https://cbu01.alicdn.com/img/ibank/O1CN01vfyY1z1NpYL6ImFLW_!!2218589811619-0-cib.jpg",
+      "url": "https://detail.1688.com/offer/973841503332.html&sku=Color:8020 washed black + hot diamond;Size:XL;&sku_id=5986895945814",
+      "vendedor": "BBBqXLvojihhLDTgiOLDdXtDA",
+      "variante": "Color:8020 washed black + hot diamond;Size:XL",
+      "precio_unitario_cny": 60.0,
+      "envio_local_cny": 6.0,
+      "envio_china_cny": 0.0,
+      "cantidad": 1,
+      "estado": "Ordered",
+      "tracking": "79009289027257",
+      "fecha_pedido": 1780504690
+    }
+  ],
+  "lastSync": "2026-06-05T12:26:09.874229"
+}
