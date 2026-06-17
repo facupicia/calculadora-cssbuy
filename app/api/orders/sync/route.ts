@@ -72,7 +72,25 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function decodeCookie(raw: string): string {
+  return raw
+    .split(";")
+    .map((pair) => {
+      const idx = pair.indexOf("=");
+      if (idx === -1) return pair.trim();
+      const key = pair.substring(0, idx).trim();
+      const val = pair.substring(idx + 1).trim();
+      try {
+        return `${key}=${decodeURIComponent(val)}`;
+      } catch {
+        return `${key}=${val}`;
+      }
+    })
+    .join("; ");
+}
+
 async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
+  const decodedCookie = decodeCookie(cookie);
   const allOrders: CssbuyOrder[] = [];
   let page = 1;
   let hasMore = true;
@@ -84,7 +102,7 @@ async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
     try {
       res = await fetch(url, {
         headers: {
-          Cookie: cookie,
+          Cookie: decodedCookie,
           "User-Agent": USER_AGENT,
           Accept: "application/json, text/plain, */*",
           "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
@@ -109,11 +127,14 @@ async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
     }
 
     let data: unknown;
+    let rawText = "";
     try {
-      data = await res.json();
+      rawText = await res.text();
+      data = JSON.parse(rawText);
     } catch {
+      const preview = rawText.substring(0, 300).replace(/\s+/g, " ").trim();
       throw new Error(
-        "CSSBuy devolvió una respuesta inesperada. Verificá que la cookie sea válida."
+        `CSSBuy no devolvió JSON válido (${res.status}). ¿Cookie expirada? Vista previa: ${preview || "(respuesta vacía)"}`
       );
     }
 
