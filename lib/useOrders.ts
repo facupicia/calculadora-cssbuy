@@ -18,7 +18,6 @@ export function useOrders() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar desde localStorage al montar
   useEffect(() => {
     try {
       const savedOrders = localStorage.getItem(STORAGE_KEY);
@@ -30,7 +29,6 @@ export function useOrders() {
     }
   }, []);
 
-  // Persistir en localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
@@ -63,30 +61,49 @@ export function useOrders() {
     }
   }, []);
 
-  const sync = useCallback(
-    async (cookie?: string) => {
-      setSyncing(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/orders/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cookie }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.details || data.error || "Error al sincronizar");
-        setOrders(data.orders);
-        setLastSync(data.lastSync);
-        return data as OrdersResponse;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error desconocido");
-        throw err;
-      } finally {
-        setSyncing(false);
-      }
-    },
-    []
-  );
+  const importFromJson = useCallback(async (jsonText: string) => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const trimmed = jsonText.trim();
+      if (!trimmed) throw new Error("Pegá el JSON generado por el script");
 
-  return { orders, lastSync, loading, syncing, error, fetchOrders, sync };
+      const parsed = JSON.parse(trimmed);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      if (arr.length === 0) throw new Error("El JSON no contiene pedidos");
+
+      const valid: CssbuyOrder[] = arr
+        .filter((o: any) => o && typeof o === "object")
+        .map((o: any) => ({
+          oid: String(o.oid ?? o.id ?? o.orderId ?? ""),
+          producto: String(o.producto ?? o.productName ?? o.name ?? o.title ?? ""),
+          imagen: String(o.imagen ?? o.productImage ?? o.image ?? o.img ?? ""),
+          url: String(o.url ?? o.productUrl ?? o.link ?? ""),
+          vendedor: String(o.vendedor ?? o.sellerName ?? o.seller ?? ""),
+          variante: String(o.variante ?? o.variant ?? o.sku ?? ""),
+          precio_unitario_cny: Number(o.precio_unitario_cny ?? o.unitPrice ?? o.price ?? 0) || 0,
+          envio_local_cny: Number(o.envio_local_cny ?? o.localShipping ?? 0) || 0,
+          envio_china_cny: Number(o.envio_china_cny ?? o.chinaShipping ?? 0) || 0,
+          cantidad: Math.max(1, Math.round(Number(o.cantidad ?? o.quantity ?? 1) || 1)),
+          estado: String(o.estado ?? o.status ?? "Ordered"),
+          tracking: String(o.tracking ?? o.trackingNumber ?? ""),
+          fecha_pedido: Number(o.fecha_pedido ?? o.orderTime ?? Math.floor(Date.now() / 1000)) || Math.floor(Date.now() / 1000),
+        }));
+
+      if (valid.length === 0) throw new Error("No se encontraron pedidos válidos en el JSON");
+
+      const stamp = new Date().toISOString();
+      setOrders(valid);
+      setLastSync(stamp);
+      return valid.length;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      setError(msg);
+      throw err;
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  return { orders, lastSync, loading, syncing, error, fetchOrders, importFromJson };
 }
