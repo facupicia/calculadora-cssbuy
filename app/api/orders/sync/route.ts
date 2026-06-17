@@ -77,7 +77,33 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function filterCookies(raw: string): string {
+  const blocked = new Set([
+    "loginip",
+    "loginip_",
+    "order_pay",
+    "echat_referrer_timer",
+    "echat_referrer",
+    "echat_referrer_pre",
+    "echat_firsturl",
+    "echat_firsttitle",
+  ]);
+  return raw
+    .split(";")
+    .map((p) => p.trim())
+    .filter((pair) => {
+      if (!pair) return false;
+      const key = pair.split("=")[0].trim().toLowerCase();
+      if (blocked.has(key)) return false;
+      if (key.startsWith("echat_") || key.startsWith("echatsoft")) return false;
+      if (key.startsWith("www.echatsoft")) return false;
+      return true;
+    })
+    .join("; ");
+}
+
 async function scrapeCssbuyOrders(cookie: string, clientIp: string): Promise<CssbuyOrder[]> {
+  const filteredCookie = filterCookies(cookie);
   const allOrders: CssbuyOrder[] = [];
   let page = 1;
   let hasMore = true;
@@ -90,7 +116,7 @@ async function scrapeCssbuyOrders(cookie: string, clientIp: string): Promise<Css
       res = await fetch(url, {
         redirect: "manual",
         headers: {
-          Cookie: cookie,
+          Cookie: filteredCookie,
           "User-Agent": USER_AGENT,
           Accept: "application/json, text/plain, */*",
           "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
