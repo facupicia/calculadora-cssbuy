@@ -4,7 +4,11 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Build outputs
+# Next.js build output
+.next/
+out/
+
+# Legacy build outputs
 frontend/dist/
 backend/dist/
 *.js.map

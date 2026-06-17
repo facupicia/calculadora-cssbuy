@@ -1,18 +1,24 @@
-import { useState } from 'react';
-import { Clock, Trash2, Calculator, Package } from 'lucide-react';
-import { Cotizacion } from '../types';
-import { fmtUSD, fmtARS } from '../lib/utils';
+"use client";
+
+import { useState } from "react";
+import { Clock, Trash2, Calculator, Package } from "lucide-react";
+import { Cotizacion } from "@/lib/types";
+import { fmtUSD, fmtARS } from "@/lib/utils";
 
 export default function History() {
   const [cots, setCots] = useState<Cotizacion[]>(() => {
-    try { return JSON.parse(localStorage.getItem('cssbuy-cotizaciones') || '[]'); } catch { return []; }
+    try {
+      return JSON.parse(localStorage.getItem("cssbuy-cotizaciones") || "[]");
+    } catch {
+      return [];
+    }
   });
 
   const eliminar = (id: string) => {
-    if (!confirm('¿Eliminar esta cotización?')) return;
-    const updated = cots.filter(c => c.id !== id);
+    if (!confirm("¿Eliminar esta cotización?")) return;
+    const updated = cots.filter((c) => c.id !== id);
     setCots(updated);
-    localStorage.setItem('cssbuy-cotizaciones', JSON.stringify(updated));
+    localStorage.setItem("cssbuy-cotizaciones", JSON.stringify(updated));
   };
 
   if (cots.length === 0) {
@@ -33,7 +39,7 @@ export default function History() {
       </div>
 
       <div className="space-y-3">
-        {cots.map(cot => {
+        {cots.map((cot) => {
           const res = cot.resultados || {};
           const items = (cot.productos || []).length;
           return (
@@ -44,9 +50,7 @@ export default function History() {
                     <Calculator className="w-4 h-4 text-primary" />
                     <h3 className="font-medium">{cot.nombre}</h3>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(cot.fecha).toLocaleString('es-AR')}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{new Date(cot.fecha).toLocaleString("es-AR")}</p>
                   <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
                     <span className="flex items-center gap-1 text-muted-foreground">
                       <Package className="w-3 h-3" />

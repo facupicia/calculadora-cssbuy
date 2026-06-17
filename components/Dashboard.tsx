@@ -1,7 +1,9 @@
-import { Package, DollarSign, TrendingUp, Percent, AlertTriangle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { CssbuyOrder } from '../types';
-import { fmtUSD } from '../lib/utils';
+"use client";
+
+import { Package, DollarSign, TrendingUp, Percent, AlertTriangle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { CssbuyOrder } from "@/lib/types";
+import { fmtUSD } from "@/lib/utils";
 
 interface DashboardProps {
   orders: CssbuyOrder[];
@@ -9,43 +11,45 @@ interface DashboardProps {
 
 export default function Dashboard({ orders }: DashboardProps) {
   const totalPedidos = orders.length;
-  const totalCostoCNY = orders.reduce((s, o) => s + (o.precio_unitario_cny * o.cantidad), 0);
+  const totalCostoCNY = orders.reduce((s, o) => s + o.precio_unitario_cny * o.cantidad, 0);
   const avgPrecio = totalPedidos > 0 ? totalCostoCNY / totalPedidos : 0;
 
-  const chartData = orders.map(o => ({
-    name: o.producto.slice(0, 20) + (o.producto.length > 20 ? '...' : ''),
-    costo: o.precio_unitario_cny * o.cantidad,
-    unitario: o.precio_unitario_cny,
-  })).slice(0, 8);
+  const chartData = orders
+    .map((o) => ({
+      name: o.producto.slice(0, 20) + (o.producto.length > 20 ? "..." : ""),
+      costo: o.precio_unitario_cny * o.cantidad,
+      unitario: o.precio_unitario_cny,
+    }))
+    .slice(0, 8);
 
   const kpiCards = [
     {
-      label: 'Pedidos Ordered',
+      label: "Pedidos Ordered",
       value: totalPedidos.toString(),
-      sub: 'Activos',
+      sub: "Activos",
       icon: Package,
-      color: 'text-blue-400',
+      color: "text-blue-400",
     },
     {
-      label: 'Costo Total (CNY)',
+      label: "Costo Total (CNY)",
       value: `¥${totalCostoCNY.toFixed(0)}`,
       sub: fmtUSD(totalCostoCNY / 7.2),
       icon: DollarSign,
-      color: 'text-emerald-400',
+      color: "text-emerald-400",
     },
     {
-      label: 'Precio Promedio',
+      label: "Precio Promedio",
       value: `¥${avgPrecio.toFixed(2)}`,
-      sub: 'Por producto',
+      sub: "Por producto",
       icon: TrendingUp,
-      color: 'text-violet-400',
+      color: "text-violet-400",
     },
     {
-      label: 'Margen Estimado',
-      value: '100%',
-      sub: 'Markup 2x',
+      label: "Margen Estimado",
+      value: "100%",
+      sub: "Markup 2x",
       icon: Percent,
-      color: 'text-amber-400',
+      color: "text-amber-400",
     },
   ];
 
@@ -77,8 +81,12 @@ export default function Dashboard({ orders }: DashboardProps) {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={60} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: 'hsl(240 10% 6%)', border: '1px solid hsl(240 6% 14%)', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fafafa' }}
+                    contentStyle={{
+                      backgroundColor: "hsl(240 10% 6%)",
+                      border: "1px solid hsl(240 6% 14%)",
+                      borderRadius: "8px",
+                    }}
+                    itemStyle={{ color: "#fafafa" }}
                   />
                   <Bar dataKey="costo" radius={[4, 4, 0, 0]}>
                     {chartData.map((_, i) => (
@@ -93,7 +101,7 @@ export default function Dashboard({ orders }: DashboardProps) {
           <div className="bg-card border border-border rounded-xl p-5">
             <h3 className="text-sm font-semibold mb-4">Resumen de Pedidos</h3>
             <div className="space-y-3">
-              {orders.slice(0, 5).map(o => (
+              {orders.slice(0, 5).map((o) => (
                 <div key={o.oid} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                   <div className="flex items-center gap-3">
                     {o.imagen ? (

@@ -1,5 +1,8 @@
-import { ExternalLink, ShoppingCart, Package, AlertCircle } from 'lucide-react';
-import { CssbuyOrder, Product } from '../types';
+"use client";
+
+import { ExternalLink, ShoppingCart, Package, AlertCircle } from "lucide-react";
+import { CssbuyOrder, Product } from "@/lib/types";
+import { uid } from "@/lib/utils";
 
 interface CssbuyOrdersProps {
   orders: CssbuyOrder[];
@@ -39,12 +42,12 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Pedidos en estado "Ordered"</h2>
+        <h2 className="text-lg font-semibold">Pedidos en estado &quot;Ordered&quot;</h2>
         <span className="text-sm text-muted-foreground">{orders.length} pedidos</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {orders.map(order => (
+        {orders.map((order) => (
           <div key={order.oid} className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors">
             <div className="flex gap-4">
               <div className="flex-shrink-0">
@@ -53,7 +56,9 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
                     src={order.imagen}
                     alt={order.producto}
                     className="w-20 h-20 object-cover rounded-lg bg-muted"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
                   />
                 ) : (
                   <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
@@ -83,12 +88,8 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
                       = ¥{(order.precio_unitario_cny + order.envio_local_cny + order.envio_china_cny).toFixed(2)}
                     </span>
                   </div>
-                  {order.variante && (
-                    <p className="text-xs text-muted-foreground truncate">{order.variante}</p>
-                  )}
-                  {order.tracking && (
-                    <p className="text-xs text-muted-foreground font-mono">{order.tracking}</p>
-                  )}
+                  {order.variante && <p className="text-xs text-muted-foreground truncate">{order.variante}</p>}
+                  {order.tracking && <p className="text-xs text-muted-foreground font-mono">{order.tracking}</p>}
                 </div>
               </div>
             </div>
@@ -116,8 +117,8 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
                     pesoG: 0,
                     cantidad: order.cantidad || 1,
                     precioVentaUSD: 0,
-                    link: order.url || '',
-                    imgURL: order.imagen || '',
+                    link: order.url || "",
+                    imgURL: order.imagen || "",
                   })
                 }
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors ml-auto"
@@ -131,8 +132,4 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
       </div>
     </div>
   );
-}
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
