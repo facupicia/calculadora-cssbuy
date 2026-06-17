@@ -55,7 +55,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Falta la cookie de sesión" }, { status: 400 });
     }
 
-    const orders = await scrapeCssbuyOrders(cookie.trim());
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
+    const orders = await scrapeCssbuyOrders(cookie.trim(), clientIp);
 
     const lastSync = new Date().toISOString();
 
@@ -72,25 +77,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function decodeCookie(raw: string): string {
-  return raw
-    .split(";")
-    .map((pair) => {
-      const idx = pair.indexOf("=");
-      if (idx === -1) return pair.trim();
-      const key = pair.substring(0, idx).trim();
-      const val = pair.substring(idx + 1).trim();
-      try {
-        return `${key}=${decodeURIComponent(val)}`;
-      } catch {
-        return `${key}=${val}`;
-      }
-    })
-    .join("; ");
-}
-
-async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
-  const decodedCookie = decodeCookie(cookie);
+async function scrapeCssbuyOrders(cookie: string, clientIp: string): Promise<CssbuyOrder[]> {
   const allOrders: CssbuyOrder[] = [];
   let page = 1;
   let hasMore = true;
@@ -101,12 +88,16 @@ async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
     let res: Response;
     try {
       res = await fetch(url, {
+        redirect: "manual",
         headers: {
-          Cookie: decodedCookie,
+          Cookie: cookie,
           "User-Agent": USER_AGENT,
           Accept: "application/json, text/plain, */*",
           "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
           Referer: "https://www.cssbuy.com/",
+          "X-Forwarded-For": clientIp,
+          "X-Real-IP": clientIp,
+          "X-Requested-With": "XMLHttpRequest",
         },
       });
     } catch (err) {
@@ -115,15 +106,21 @@ async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
       );
     }
 
+    if (res.status === 302 || res.status === 301) {
+      throw new Error(
+        "CSSBuy redirigió a login. La cookie expiró o no es válida."
+      );
+    }
+
     if (res.status === 401 || res.status === 403) {
       throw new Error(
-        "Cookie inválida o sesión expirada. Volvé a copiar la cookie desde el navegador."
+        "CSSBuy rechazó la cookie (401/403). La sesión puede estar atada a tu IP — el servidor de Vercel tiene una IP distinta a la tuya. Probá copiar una cookie fresca."
       );
     }
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      throw new Error(`CSSBuy respondió con error ${res.status}${body ? `: ${body}` : ""}`);
+      throw new Error(`CSSBuy respondió con error ${res.status}${body ? `: ${body.substring(0, 200)}` : ""}`);
     }
 
     let data: unknown;
@@ -134,14 +131,15 @@ async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
     } catch {
       const preview = rawText.substring(0, 300).replace(/\s+/g, " ").trim();
       throw new Error(
-        `CSSBuy no devolvió JSON válido (${res.status}). ¿Cookie expirada? Vista previa: ${preview || "(respuesta vacía)"}`
+        `CSSBuy no devolvió JSON (${res.status}). Vista previa: ${preview || "(respuesta vacía)"}`
       );
     }
 
     const rawList = extractList(data);
     if (!Array.isArray(rawList)) {
+      const preview = JSON.stringify(data).substring(0, 300);
       throw new Error(
-        `Formato de respuesta inesperado de CSSBuy. Esperaba un array de pedidos.`
+        `Formato de respuesta inesperado. Esperaba un array. Respuesta: ${preview}`
       );
     }
 
@@ -177,7 +175,6 @@ function extractList(data: unknown): unknown {
   if (Array.isArray(data)) return data;
   if (data && typeof data === "object") {
     const d = data as Record<string, unknown>;
-    // Formatos comunes de respuesta de API
     if (Array.isArray(d.list)) return d.list;
     if (Array.isArray(d.orders)) return d.orders;
     if (d.data && typeof d.data === "object") {
