@@ -4,18 +4,49 @@ import { CssbuyOrder } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 10; // Vercel Hobby max timeout
 
-/**
- * Scraper de CSSBuy escrito en TypeScript.
- *
- * TODO: Completar con los endpoints reales de CSSBuy.
- * Actualmente está preparado para recibir una cookie y hacer fetch,
- * pero la URL y el parseo deben ajustarse según la API real.
- *
- * Para completar:
- * 1. Pegá la URL de la API de CSSBuy que devuelve el listado de pedidos.
- * 2. Ajustá el parseo de la respuesta al formato real.
- * 3. Eliminá el fallback de ejemplo.
- */
+const CSSBUY_API = "https://www.cssbuy.com/api/order/list";
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const PAGE_SIZE = 50;
+const MAX_ORDERS = 500;
+
+interface CssbuyApiItem {
+  oid?: string | number;
+  id?: string | number;
+  orderId?: string | number;
+  productName?: string;
+  name?: string;
+  title?: string;
+  productImage?: string;
+  image?: string;
+  img?: string;
+  productUrl?: string;
+  url?: string;
+  link?: string;
+  sellerName?: string;
+  seller?: string;
+  storeName?: string;
+  variant?: string;
+  sku?: string;
+  specification?: string;
+  unitPrice?: number | string;
+  price?: number | string;
+  localShipping?: number | string;
+  domesticShipping?: number | string;
+  chinaShipping?: number | string;
+  internationalShipping?: number | string;
+  quantity?: number | string;
+  qty?: number | string;
+  status?: string;
+  state?: string;
+  tracking?: string;
+  trackingNumber?: string;
+  trackNo?: string;
+  orderTime?: number | string;
+  createTime?: number | string;
+  createdAt?: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { cookie } = (await req.json()) as { cookie?: string };
@@ -42,43 +73,163 @@ export async function POST(req: NextRequest) {
 }
 
 async function scrapeCssbuyOrders(cookie: string): Promise<CssbuyOrder[]> {
-  // ==========================================================================
-  // REEMPLAZAR ESTA SECCIÓN CON LOS ENDPOINTS REALES DE CSSBUY
-  // ==========================================================================
-  // Ejemplo de cómo se vería una llamada real:
-  //
-  // const res = await fetch("https://www.cssbuy.com/api/order/list?status=Ordered", {
-  //   headers: {
-  //     Cookie: cookie,
-  //     "User-Agent": "Mozilla/5.0 ...",
-  //     Accept: "application/json",
-  //   },
-  // });
-  //
-  // if (!res.ok) throw new Error(`CSSBuy respondió ${res.status}`);
-  // const data = await res.json();
-  // return data.orders.map((o: any) => ({ ... }));
-  // ==========================================================================
+  const allOrders: CssbuyOrder[] = [];
+  let page = 1;
+  let hasMore = true;
 
-  // Fallback: simulación para que la app no se rompa mientras se configura.
-  // En producción esto debería ser reemplazado por el scrapeo real.
-  console.warn("Scraper de CSSBuy no configurado. Devolviendo datos de ejemplo.");
+  while (hasMore) {
+    const url = `${CSSBUY_API}?status=Ordered&page=${page}&limit=${PAGE_SIZE}`;
 
-  return [
-    {
-      oid: "20262233",
-      producto: "[EJEMPLO] Trendy Foreign Trade Brand T-Shirt",
-      imagen: "https://cbu01.alicdn.com/img/ibank/O1CN01kXzOpN1aNEpBb1gbr_!!2214795683317-0-cib.jpg",
-      url: "https://detail.1688.com/offer/948710599928.html",
-      vendedor: "vendedor-ejemplo",
-      variante: "Color: apricot; Size: XL",
-      precio_unitario_cny: 60,
-      envio_local_cny: 5,
-      envio_china_cny: 0,
-      cantidad: 1,
-      estado: "Ordered",
-      tracking: "79000000000000",
-      fecha_pedido: Math.floor(Date.now() / 1000),
-    },
-  ];
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: {
+          Cookie: cookie,
+          "User-Agent": USER_AGENT,
+          Accept: "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+          Referer: "https://www.cssbuy.com/",
+        },
+      });
+    } catch (err) {
+      throw new Error(
+        `No se pudo conectar a CSSBuy: ${err instanceof Error ? err.message : "Error de red"}`
+      );
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(
+        "Cookie inválida o sesión expirada. Volvé a copiar la cookie desde el navegador."
+      );
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`CSSBuy respondió con error ${res.status}${body ? `: ${body}` : ""}`);
+    }
+
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(
+        "CSSBuy devolvió una respuesta inesperada. Verificá que la cookie sea válida."
+      );
+    }
+
+    const rawList = extractList(data);
+    if (!Array.isArray(rawList)) {
+      throw new Error(
+        `Formato de respuesta inesperado de CSSBuy. Esperaba un array de pedidos.`
+      );
+    }
+
+    for (const item of rawList) {
+      allOrders.push(mapOrder(item as CssbuyApiItem));
+    }
+
+    const total = extractTotal(data);
+    if (total !== null && allOrders.length >= total) {
+      hasMore = false;
+    } else if (rawList.length < PAGE_SIZE) {
+      hasMore = false;
+    } else {
+      page++;
+    }
+
+    if (allOrders.length >= MAX_ORDERS) {
+      hasMore = false;
+    }
+  }
+
+  if (allOrders.length === 0) {
+    throw new Error(
+      "No se encontraron pedidos en estado 'Ordered'. ¿Está vacía la lista?"
+    );
+  }
+
+  console.log(`Scraper: ${allOrders.length} pedidos sincronizados.`);
+  return allOrders;
+}
+
+function extractList(data: unknown): unknown {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    const d = data as Record<string, unknown>;
+    // Formatos comunes de respuesta de API
+    if (Array.isArray(d.list)) return d.list;
+    if (Array.isArray(d.orders)) return d.orders;
+    if (d.data && typeof d.data === "object") {
+      const inner = d.data as Record<string, unknown>;
+      if (Array.isArray(inner.list)) return inner.list;
+      if (Array.isArray(inner.orders)) return inner.orders;
+    }
+  }
+  return null;
+}
+
+function extractTotal(data: unknown): number | null {
+  if (data && typeof data === "object") {
+    const d = data as Record<string, unknown>;
+    if (typeof d.total === "number") return d.total;
+    if (d.data && typeof d.data === "object") {
+      const inner = d.data as Record<string, unknown>;
+      if (typeof inner.total === "number") return inner.total;
+      if (inner.pageInfo && typeof inner.pageInfo === "object") {
+        const pi = inner.pageInfo as Record<string, unknown>;
+        if (typeof pi.total === "number") return pi.total;
+      }
+    }
+  }
+  return null;
+}
+
+function mapOrder(raw: CssbuyApiItem): CssbuyOrder {
+  const precio = toNum(raw.unitPrice, raw.price, 0);
+  const envioLocal = toNum(raw.localShipping, raw.domesticShipping, 0);
+  const envioChina = toNum(raw.chinaShipping, raw.internationalShipping, 0);
+
+  return {
+    oid: String(raw.oid ?? raw.id ?? raw.orderId ?? ""),
+    producto: raw.productName ?? raw.name ?? raw.title ?? "",
+    imagen: raw.productImage ?? raw.image ?? raw.img ?? "",
+    url: raw.productUrl ?? raw.url ?? raw.link ?? "",
+    vendedor: raw.sellerName ?? raw.seller ?? raw.storeName ?? "",
+    variante: raw.variant ?? raw.sku ?? raw.specification ?? "",
+    precio_unitario_cny: precio,
+    envio_local_cny: envioLocal,
+    envio_china_cny: envioChina,
+    cantidad: toNumInt(raw.quantity, raw.qty, 1),
+    estado: raw.status ?? raw.state ?? "Ordered",
+    tracking: raw.tracking ?? raw.trackingNumber ?? raw.trackNo ?? "",
+    fecha_pedido: parseTimestamp(raw.orderTime, raw.createTime, raw.createdAt),
+  };
+}
+
+function toNum(...values: (number | string | undefined)[]): number {
+  for (const v of values) {
+    if (v === undefined || v === null) continue;
+    const n = typeof v === "string" ? parseFloat(v) : v;
+    if (!isNaN(n)) return n;
+  }
+  return 0;
+}
+
+function toNumInt(...values: (number | string | undefined)[]): number {
+  const n = toNum(...values);
+  return Math.max(1, Math.round(n));
+}
+
+function parseTimestamp(
+  ts?: number | string,
+  ts2?: number | string,
+  str?: string
+): number {
+  const num = toNum(ts, ts2);
+  if (num > 0) return num;
+  if (typeof str === "string") {
+    const parsed = Date.parse(str);
+    if (!isNaN(parsed)) return Math.floor(parsed / 1000);
+  }
+  return Math.floor(Date.now() / 1000);
 }
