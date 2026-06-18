@@ -63,40 +63,59 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
     return null;
   };
 
+  const tryQueries = ["inchina", ""];
+  let usedQuery = tryQueries[0];
+
   while (hasMore) {
-    const params = new URLSearchParams();
-    params.set("orderState", "all");
-    params.set("starttime", "");
-    params.set("endtime", "");
-    params.set("pageSize", String(PAGE_SIZE));
-    params.set("pageNum", String(page));
-    params.set("query", "inchina");
+    let lastData = null;
+    let list = null;
 
-    const res = await fetch("https://www.cssbuy.com/web/order", {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "X-Requested-With": "XMLHttpRequest",
-        Accept: "application/json, text/javascript, */*; q=0.01",
-      },
-      body: params.toString(),
-    });
+    for (const query of tryQueries) {
+      const params = new URLSearchParams();
+      params.set("orderState", "all");
+      params.set("starttime", "");
+      params.set("endtime", "");
+      params.set("pageSize", String(PAGE_SIZE));
+      params.set("pageNum", String(page));
+      params.set("query", query);
 
-    if (!res.ok) {
-      console.error("HTTP", res.status, await res.text());
-      throw new Error("CSSBuy respondio " + res.status);
+      const res = await fetch("https://www.cssbuy.com/web/order", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json, text/javascript, */*; q=0.01",
+        },
+        body: params.toString(),
+      });
+
+      if (!res.ok) {
+        console.error("HTTP", res.status, await res.text());
+        throw new Error("CSSBuy respondio " + res.status);
+      }
+
+      const data = await res.json();
+      lastData = data;
+      const extracted = extractList(data);
+      if (Array.isArray(extracted) && extracted.length > 0) {
+        list = extracted;
+        usedQuery = query;
+        break;
+      }
     }
 
-    const data = await res.json();
-    const list = extractList(data);
+    if (page === 1) {
+      console.log("Respuesta completa pagina 1:", lastData);
+      console.log("Query usado:", usedQuery);
+      if (Array.isArray(list) && list.length > 0) {
+        console.log("Primer item crudo:", list[0]);
+      }
+    }
+
     if (!Array.isArray(list)) {
-      console.error("Formato inesperado:", data);
+      console.error("Formato inesperado:", lastData);
       throw new Error("Formato de respuesta inesperado");
-    }
-
-    if (list.length > 0 && page === 1) {
-      console.log("Primer item crudo:", list[0]);
     }
 
     for (const it of list) all.push(mapItem(it));
