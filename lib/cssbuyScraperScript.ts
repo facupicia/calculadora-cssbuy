@@ -32,19 +32,21 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
   };
 
   const mapItem = (raw) => ({
-    oid: String(pick(raw, "oid", "id", "orderId") ?? ""),
-    producto: pick(raw, "productName", "name", "title") ?? "",
-    imagen: pick(raw, "productImage", "image", "img") ?? "",
-    url: pick(raw, "productUrl", "url", "link") ?? "",
-    vendedor: pick(raw, "sellerName", "seller", "storeName") ?? "",
-    variante: pick(raw, "variant", "sku", "specification") ?? "",
-    precio_unitario_cny: num(pick(raw, "unitPrice", "price")),
-    envio_local_cny: num(pick(raw, "localShipping", "domesticShipping")),
-    envio_china_cny: num(pick(raw, "chinaShipping", "internationalShipping")),
-    cantidad: intN(pick(raw, "quantity", "qty")),
-    estado: pick(raw, "status", "state") ?? "Ordered",
-    tracking: pick(raw, "tracking", "trackingNumber", "trackNo") ?? "",
-    fecha_pedido: ts(raw.orderTime, raw.createTime, raw.createdAt),
+    oid: String(pick(raw, "orderId", "orderno", "id", "oid", "orderNo", "ordernumber") ?? ""),
+    producto: pick(raw, "goodsname", "productName", "name", "title", "product") ?? "",
+    imagen: pick(raw, "goodsimg", "productImage", "image", "img", "pic") ?? "",
+    url: pick(raw, "goodsurl", "productUrl", "url", "link", "itemurl") ?? "",
+    vendedor: pick(raw, "seller", "storename", "storeName", "sellerName", "shopname") ?? "",
+    variante: [pick(raw, "goodscolor", "color"), pick(raw, "goodssize", "size", "goodsskuname")]
+      .filter(Boolean)
+      .join("; ") || (pick(raw, "sku", "variant", "specification", "goodsskuname") ?? ""),
+    precio_unitario_cny: num(pick(raw, "goodsprice", "goodsprice_def", "unitprice", "unitPrice", "price")),
+    envio_local_cny: num(pick(raw, "sendprice", "sendprice_def", "localShipping", "domesticShipping", "freight")),
+    envio_china_cny: num(pick(raw, "chinashipping", "chinaShipping", "internationalShipping", "interShipping")),
+    cantidad: intN(pick(raw, "quantity", "qty", "num", "goodsnum")),
+    estado: pick(raw, "orderstate", "status", "state") ?? "",
+    tracking: pick(raw, "trackno", "tracking", "trackingNumber", "expressno", "expressNo") ?? "",
+    fecha_pedido: ts(raw.addtime, raw.createtime, raw.ordertime, raw.orderTime, raw.createTime, raw.createdAt),
   });
 
   const extractList = (data) => {
@@ -52,32 +54,51 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
     if (!data || typeof data !== "object") return null;
     if (Array.isArray(data.list)) return data.list;
     if (Array.isArray(data.orders)) return data.orders;
+    if (Array.isArray(data.data)) return data.data;
     if (data.data && typeof data.data === "object") {
       if (Array.isArray(data.data.list)) return data.data.list;
       if (Array.isArray(data.data.orders)) return data.data.orders;
+      if (Array.isArray(data.data.data)) return data.data.data;
     }
     return null;
   };
 
   while (hasMore) {
-    const url = \`https://www.cssbuy.com/api/order/list?status=Ordered&page=\${page}&limit=\${PAGE_SIZE}\`;
-    const res = await fetch(url, {
+    const params = new URLSearchParams();
+    params.set("orderState", "all");
+    params.set("starttime", "");
+    params.set("endtime", "");
+    params.set("pageSize", String(PAGE_SIZE));
+    params.set("pageNum", String(page));
+    params.set("query", "inchina");
+
+    const res = await fetch("https://www.cssbuy.com/web/order", {
+      method: "POST",
       credentials: "include",
       headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
-        Accept: "application/json, text/plain, */*",
+        Accept: "application/json, text/javascript, */*; q=0.01",
       },
+      body: params.toString(),
     });
+
     if (!res.ok) {
       console.error("HTTP", res.status, await res.text());
       throw new Error("CSSBuy respondio " + res.status);
     }
+
     const data = await res.json();
     const list = extractList(data);
     if (!Array.isArray(list)) {
       console.error("Formato inesperado:", data);
       throw new Error("Formato de respuesta inesperado");
     }
+
+    if (list.length > 0 && page === 1) {
+      console.log("Primer item crudo:", list[0]);
+    }
+
     for (const it of list) all.push(mapItem(it));
     if (list.length < PAGE_SIZE || all.length >= MAX_ORDERS) hasMore = false;
     else page++;
