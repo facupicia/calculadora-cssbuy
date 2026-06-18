@@ -45,3 +45,6 @@ __pycache__/
 
 # Local data
 cssbuy_data/
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
