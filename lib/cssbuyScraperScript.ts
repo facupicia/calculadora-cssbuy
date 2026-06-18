@@ -7,6 +7,7 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
   const PAGE_SIZE = 50;
   const MAX_ORDERS = 500;
   const all = [];
+  const allRaw = [];
   let page = 1;
   let hasMore = true;
 
@@ -31,6 +32,23 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
     return undefined;
   };
 
+  const ALLOWED_STATUSES = new Set([
+    "ordered", "in warehouse", "inwarehouse", "warehouse",
+    "3", "4", "5", "6", "7", "8", "9", "10",
+    3, 4, 5, 6, 7, 8, 9, 10,
+  ]);
+  const statusNameMap = {
+    3: "Ordered",
+    4: "In Warehouse",
+  };
+
+  const isAllowedStatus = (raw) => {
+    const rawStatus = pick(raw, "orderstate", "status", "state", "orderState");
+    if (rawStatus == null || rawStatus === "") return true;
+    const s = String(rawStatus).toLowerCase().trim();
+    return ALLOWED_STATUSES.has(s) || ALLOWED_STATUSES.has(rawStatus);
+  };
+
   const mapItem = (raw) => ({
     oid: String(pick(raw, "orderId", "orderno", "id", "oid", "orderNo", "ordernumber") ?? ""),
     producto: pick(raw, "goodsname", "productName", "name", "title", "product") ?? "",
@@ -39,12 +57,12 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
     vendedor: pick(raw, "seller", "storename", "storeName", "sellerName", "shopname") ?? "",
     variante: [pick(raw, "goodscolor", "color"), pick(raw, "goodssize", "size", "goodsskuname")]
       .filter(Boolean)
-      .join("; ") || (pick(raw, "sku", "variant", "specification", "goodsskuname") ?? ""),
+      .join("; ") || (pick(raw, "sku", "variant", "specification") ?? ""),
     precio_unitario_cny: num(pick(raw, "goodsprice", "goodsprice_def", "unitprice", "unitPrice", "price")),
     envio_local_cny: num(pick(raw, "sendprice", "sendprice_def", "localShipping", "domesticShipping", "freight")),
     envio_china_cny: num(pick(raw, "chinashipping", "chinaShipping", "internationalShipping", "interShipping")),
     cantidad: intN(pick(raw, "quantity", "qty", "num", "goodsnum")),
-    estado: pick(raw, "orderstate", "status", "state") ?? "",
+    estado: statusNameMap[pick(raw, "orderstate", "status", "state", "orderState")] || String(pick(raw, "orderstate", "status", "state", "orderState") ?? ""),
     tracking: pick(raw, "trackno", "tracking", "trackingNumber", "expressno", "expressNo") ?? "",
     fecha_pedido: ts(raw.addtime, raw.createtime, raw.ordertime, raw.orderTime, raw.createTime, raw.createdAt),
   });
@@ -118,9 +136,25 @@ export const CSSBUY_SCRAPER_SCRIPT = `// CSSBuy scraper (corre en cssbuy.com des
       throw new Error("Formato de respuesta inesperado");
     }
 
-    for (const it of list) all.push(mapItem(it));
+    for (const it of list) {
+      allRaw.push(it);
+      if (isAllowedStatus(it)) all.push(mapItem(it));
+    }
     if (list.length < PAGE_SIZE || all.length >= MAX_ORDERS) hasMore = false;
     else page++;
+  }
+
+  const skipped = [];
+  const seenStatus = new Set();
+  for (const it of allRaw) {
+    const s = pick(it, "orderstate", "status", "state", "orderState");
+    if (!isAllowedStatus(it) && !seenStatus.has(String(s))) {
+      seenStatus.add(String(s));
+      skipped.push({ estadoRaw: s, producto: pick(it, "goodsname", "productName", "name", "title") });
+    }
+  }
+  if (skipped.length > 0) {
+    console.log("Estados descartados (no estan en la lista blanca):", skipped);
   }
 
   const json = JSON.stringify(all, null, 2);
