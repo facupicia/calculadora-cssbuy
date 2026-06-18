@@ -13,7 +13,7 @@ import { Product } from "@/lib/types";
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const { orders, lastSync, syncing, error, importFromJson } = useOrders();
+  const { orders, lastSync, syncing, error, sync, importFromJson } = useOrders();
 
   const [importedLinks, setImportedLinks] = useState<Set<string>>(new Set());
 
@@ -24,10 +24,6 @@ export default function Home() {
     }
     setImportedLinks((prev) => new Set(prev).add(product.link));
     setActiveTab("calculator");
-  };
-
-  const handleImportJson = async (json: string) => {
-    return importFromJson(json);
   };
 
   return (
@@ -52,7 +48,8 @@ export default function Home() {
       <SyncDialog
         open={syncDialogOpen}
         onClose={() => setSyncDialogOpen(false)}
-        onImport={handleImportJson}
+        onSyncCookie={sync}
+        onImportJson={importFromJson}
         syncing={syncing}
       />
     </div>

@@ -61,6 +61,29 @@ export function useOrders() {
     }
   }, []);
 
+  const sync = useCallback(async (cookie?: string) => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/orders/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cookie }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.details || data.error || "Error al sincronizar");
+      setOrders(data.orders);
+      setLastSync(data.lastSync);
+      return data as OrdersResponse;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      setError(msg);
+      throw err;
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
   const importFromJson = useCallback(async (jsonText: string) => {
     setSyncing(true);
     setError(null);
@@ -105,5 +128,5 @@ export function useOrders() {
     }
   }, []);
 
-  return { orders, lastSync, loading, syncing, error, fetchOrders, importFromJson };
+  return { orders, lastSync, loading, syncing, error, fetchOrders, sync, importFromJson };
 }
