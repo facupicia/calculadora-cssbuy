@@ -1,32 +1,24 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
 import HomeClient from "./HomeClient";
 import { CssbuyOrder } from "@/lib/types";
 
 async function getOrders(): Promise<CssbuyOrder[]> {
   try {
-    const dataPath = path.join(process.cwd(), "public", "data", "orders.json");
-    const content = await fs.readFile(dataPath, "utf-8");
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed?.orders) ? parsed.orders : [];
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+    );
+    const { data } = await supabase
+      .from("cssbuy_warehouse")
+      .select("*")
+      .order("fecha_pedido", { ascending: false });
+    return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
 }
 
-async function getLastSync(): Promise<string | null> {
-  try {
-    const dataPath = path.join(process.cwd(), "public", "data", "orders.json");
-    const content = await fs.readFile(dataPath, "utf-8");
-    const parsed = JSON.parse(content);
-    return parsed?.lastSync ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function Home() {
   const orders = await getOrders();
-  const lastSync = await getLastSync();
-  return <HomeClient initialOrders={orders} initialLastSync={lastSync} />;
+  return <HomeClient initialOrders={orders} initialLastSync={new Date().toISOString()} />;
 }
