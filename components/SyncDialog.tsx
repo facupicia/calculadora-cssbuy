@@ -3,14 +3,75 @@
 import { useState, useRef } from "react";
 import { X, AlertCircle, Copy, Check, Upload, FileJson } from "lucide-react";
 
-const CONSOLE_SCRIPT = `// 1. Andá a https://www.cssbuy.com/web/order y logueate
-// 2. Abrí DevTools (F12) → Console
-// 3. Pegá este script entero y dale Enter
-// 4. Se descarga automáticamente orders.json (solo productos en almacén)
-// 5. Volvé acá y subí el archivo descargado
-
-(async()=>{
-const P=50,M=500,A=[],pk=(o,...k)=>{for(const x of k){const v=o?.[x];if(v!=null&&v!=="")return typeof v==="string"?v:String(v)}},tn=(...vs)=>{for(const v of vs){if(v===undefined||v===null)continue;const n=typeof v==="string"?parseFloat(v):v;if(!isNaN(n))return n}return 0},ti=(...vs)=>Math.max(1,Math.round(tn(...vs))),pt=(ts,ts2,ts3,ts4,ts5,s)=>{const n=tn(ts,ts2,ts3,ts4,ts5);if(n>0)return n;if(typeof s==="string"){const p=Date.parse(s);if(!isNaN(p))return Math.floor(p/1e3)}return Math.floor(Date.now()/1e3)},mo=r=>({oid:String(pk(r,"orderId","orderno","id","oid","orderNo","ordernumber")??""),producto:String(pk(r,"goodsname","productName","name","title","product")??""),imagen:String(pk(r,"goodsimg","productImage","image","img","pic")??""),url:String(pk(r,"goodsurl","productUrl","url","link","itemurl")??""),vendedor:String(pk(r,"seller","storename","storeName","sellerName","shopname")??""),variante:String([pk(r,"goodscolor","color"),pk(r,"goodssize","size","goodsskuname")].filter(Boolean).join("; ")||(pk(r,"sku","variant","specification","goodsskuname")??"")),precio_unitario_cny:tn(pk(r,"goodsprice","goodsprice_def","unitprice","unitPrice","price")),envio_local_cny:tn(pk(r,"sendprice","sendprice_def","localShipping","domesticShipping","freight")),envio_china_cny:tn(pk(r,"chinashipping","chinaShipping","internationalShipping","interShipping")),cantidad:ti(pk(r,"quantity","qty","num","goodsnum")),estado:String(pk(r,"orderstate","status","state")??""),peso_g:function(w){if(!w)return 0;if(typeof w==="number")return w;try{const p=JSON.parse(String(w));return Array.isArray(p)?(Number(p[0])||0):(Number(w)||0)}catch{return Number(String(w).match(/\d+/)?.[0])||0}}(pk(r,"orderweight","weight")),tracking:String(pk(r,"trackno","tracking","trackingNumber","expressno","expressNo")??""),fecha_pedido:pt(r.addtime,r.createtime,r.ordertime,r.orderTime,r.createTime,r.createdAt)}),el=d=>{if(Array.isArray(d))return d;if(d&&typeof d==="object"){if(Array.isArray(d.list))return d.list;if(Array.isArray(d.orders))return d.orders;if(Array.isArray(d.data))return d.data;if(d.data&&typeof d.data==="object"){if(Array.isArray(d.data.list))return d.data.list;if(Array.isArray(d.data.orders))return d.data.orders;if(Array.isArray(d.data.data))return d.data.data}}return null};let csrf="";try{csrf=document.querySelector('meta[name="csrf-token"]')?.getAttribute("content")||""}catch{}if(!csrf){const m=document.documentElement.innerHTML.match(/csrf[_-]?token["'\\s:=]+["']?([a-zA-Z0-9]+)/i);if(m)csrf=m[1]}let pn=1,hm=true;while(hm){const p=new URLSearchParams();p.set("orderState","all");p.set("starttime","");p.set("endtime","");p.set("pageSize",String(P));p.set("pageNum",String(pn));p.set("query","");p.set("inchina","");if(csrf)p.set("_token",csrf);const r=await fetch("https://www.cssbuy.com/web/order",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest","X-CSRF-Token":csrf,"X-XSRF-TOKEN":csrf,Accept:"application/json, text/javascript, */*; q=0.01"},body:p.toString()}),t=await r.text();let d;try{d=JSON.parse(t)}catch{console.error("No JSON:",t.substring(0,500));break}const l=el(d);if(!Array.isArray(l)){console.error("Formato:",JSON.stringify(d).substring(0,500));break}for(const it of l){const o=mo(it);if(o.estado==='4'||o.estado==='In Warehouse')A.push(o)}console.log(\`Pág \${pn}: \${l.length} raw, \${A.length} warehouse\`);hm=l.length>=P&&A.length<M;if(hm)pn++}console.log(\`\\n✅ \${A.length} pedidos totales\`);const b=new Blob([JSON.stringify({orders:A,lastSync:new Date().toISOString()},null,2)],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="orders.json";a.click();URL.revokeObjectURL(u);console.log("💾 orders.json descargado!");console.table(A.slice(0,10).map(o=>({oid:o.oid,producto:o.producto?.substring(0,50),estado:o.estado,precio:o.precio_unitario_cny,cant:o.cantidad})))})();`;
+const CONSOLE_SCRIPT = [
+  "// CSSBuy Warehouse Scraper — solo productos en almacén",
+  "// 1. Andá a https://www.cssbuy.com/web/order y logueate",
+  "// 2. F12 → Console → Pegá esto → Enter",
+  "// 3. Se descarga orders.json, subilo en esta página",
+  "",
+  "(async()=>{",
+  "const P=50,M=500,A=[];",
+  "",
+  "function peso(w){",
+  "  if(!w)return 0;",
+  "  if(typeof w==='number')return w;",
+  "  try{const p=JSON.parse(String(w));return Array.isArray(p)?(Number(p[0])||0):(Number(w)||0)}",
+  "  catch{return Number(String(w).match(/\\d+/)?.[0])||0}",
+  "}",
+  "",
+  "function map(it){",
+  "  return{",
+  "    oid:String(it.oid??''),",
+  "    producto:String(it.goodsname??''),",
+  "    imagen:String(it.goodsimg??it.skuimg??''),",
+  "    url:String(it.goodsurl??''),",
+  "    vendedor:String(it.goodsseller??''),",
+  "    variante:String(it.goodssize??''),",
+  "    precio_unitario_cny:Number(it.goodsprice)||0,",
+  "    envio_local_cny:Number(it.sendprice)||0,",
+  "    envio_china_cny:Number(it.chinashipping)||0,",
+  "    cantidad:Math.max(1,Math.round(Number(it.goodsnum)||1)),",
+  "    estado:String(it.statename??it.state??''),",
+  "    peso_g:peso(it.orderweight),",
+  "    tracking:String(it.expressno??''),",
+  "    fecha_pedido:Number(it.addtime)||Math.floor(Date.now()/1000)",
+  "  }",
+  "}",
+  "",
+  "let csrf='';",
+  "try{csrf=document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content')||''}catch{}",
+  "if(!csrf){const m=document.documentElement.innerHTML.match(/csrf[_-]?token['\"\\s:=]+['\"]?([a-zA-Z0-9]+)/i);if(m)csrf=m[1]}",
+  "",
+  "let pn=1,hm=true;",
+  "while(hm){",
+  "  const params=new URLSearchParams();",
+  "  params.set('orderState','all');params.set('starttime','');params.set('endtime','');",
+  "  params.set('pageSize',String(P));params.set('pageNum',String(pn));",
+  "  params.set('query','');params.set('inchina','');",
+  "  if(csrf)params.set('_token',csrf);",
+  "  const res=await fetch('https://www.cssbuy.com/web/order',{",
+  "    method:'POST',",
+  "    headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest','X-CSRF-Token':csrf,'X-XSRF-TOKEN':csrf,Accept:'application/json, text/javascript, */*; q=0.01'},",
+  "    body:params.toString()",
+  "  });",
+  "  const text=await res.text();",
+  "  let data;try{data=JSON.parse(text)}catch{console.error('No JSON:',text.substring(0,500));break}",
+  "  let list=data?.list??data?.orders??data?.data?.list??data?.data?.orders??data?.data?.data??data;",
+  "  if(!Array.isArray(list)){console.error('Formato:',JSON.stringify(data).substring(0,500));break}",
+  "  for(const it of list){if(it.state===4||it.statename==='In Warehouse')A.push(map(it))}",
+  "  console.log('Pág '+pn+': '+list.length+' raw, '+A.length+' warehouse');",
+  "  hm=list.length>=P&&A.length<M;",
+  "  if(hm)pn++",
+  "}",
+  "console.log('\\n✅ '+A.length+' pedidos en almacén');",
+  "const blob=new Blob([JSON.stringify({orders:A,lastSync:new Date().toISOString()},null,2)],{type:'application/json'});",
+  "const url=URL.createObjectURL(blob);",
+  "const a=document.createElement('a');a.href=url;a.download='orders.json';a.click();",
+  "URL.revokeObjectURL(url);",
+  "console.log('💾 orders.json descargado!');",
+  "console.table(A.slice(0,10).map(o=>({oid:o.oid,producto:o.producto?.substring(0,50),estado:o.estado,peso:o.peso_g,precio:o.precio_unitario_cny})))",
+  "})();",
+].join("\n");
 
 interface SyncDialogProps {
   open: boolean;
@@ -37,23 +98,6 @@ export default function SyncDialog({ open, onClose, onImportJson, onImportFile, 
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore
-    }
-  };
-
-  const handleJsonSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(false);
-    try {
-      const count = await onImportJson(json.trim());
-      setSuccess(true);
-      setJson("");
-      setTimeout(() => {
-        setSuccess(false);
-        onClose();
-      }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
     }
   };
 
@@ -140,7 +184,7 @@ export default function SyncDialog({ open, onClose, onImportJson, onImportFile, 
           {/* Opción 2: Script de consola */}
           <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Opción 2 · Script de consola (para scrapeo inicial)
+              Opción 2 · Script de consola (solo almacén)
             </div>
 
             <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-400 flex items-start gap-2">
@@ -148,7 +192,7 @@ export default function SyncDialog({ open, onClose, onImportJson, onImportFile, 
               <div>
                 <p className="mb-2"><strong>Instrucciones:</strong></p>
                 <ol className="list-decimal pl-4 space-y-1">
-                  <li>Abrí <a href="https://www.cssbuy.com/web/order?type=all" target="_blank" rel="noreferrer" className="underline">cssbuy.com</a> y logueate</li>
+                  <li>Abrí <a href="https://www.cssbuy.com/web/order" target="_blank" rel="noreferrer" className="underline">cssbuy.com/web/order</a> y logueate</li>
                   <li>Abrí DevTools con <kbd className="px-1 py-0.5 bg-secondary/50 rounded">F12</kbd></li>
                   <li>Andá a la pestaña <strong>Console</strong></li>
                   <li>Copiá el script de abajo, pegalo y dale Enter</li>
@@ -159,7 +203,7 @@ export default function SyncDialog({ open, onClose, onImportJson, onImportFile, 
             </div>
 
             <div className="relative">
-              <pre className="bg-secondary/30 border border-border rounded-lg p-3 text-[10px] font-mono overflow-x-auto max-h-32 overflow-y-auto whitespace-pre leading-relaxed">
+              <pre className="bg-secondary/30 border border-border rounded-lg p-3 text-[10px] font-mono overflow-x-auto max-h-64 overflow-y-auto whitespace-pre leading-relaxed">
                 {CONSOLE_SCRIPT}
               </pre>
               <button
