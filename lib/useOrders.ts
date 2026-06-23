@@ -23,12 +23,17 @@ export function useOrders() {
     try {
       const savedOrders = localStorage.getItem(STORAGE_KEY);
       const savedSync = localStorage.getItem(STORAGE_SYNC_KEY);
-      if (savedOrders) setOrders(JSON.parse(savedOrders));
-      if (savedSync) setLastSync(savedSync);
+      if (savedOrders) {
+        setOrders(JSON.parse(savedOrders));
+        if (savedSync) setLastSync(savedSync);
+      } else {
+        // No hay datos en localStorage, cargar del server
+        fetchOrders();
+      }
     } catch {
       // ignore
     }
-  }, []);
+  }, [fetchOrders]);
 
   useEffect(() => {
     try {
