@@ -12,9 +12,9 @@ interface OrdersResponse {
 const STORAGE_KEY = "cssbuy-orders";
 const STORAGE_SYNC_KEY = "cssbuy-last-sync";
 
-export function useOrders() {
-  const [orders, setOrders] = useState<CssbuyOrder[]>([]);
-  const [lastSync, setLastSync] = useState<string | null>(null);
+export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: string | null = null) {
+  const [orders, setOrders] = useState<CssbuyOrder[]>(initialOrders);
+  const [lastSync, setLastSync] = useState<string | null>(initialLastSync);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,13 +43,14 @@ export function useOrders() {
       if (savedOrders) {
         setOrders(JSON.parse(savedOrders));
         if (savedSync) setLastSync(savedSync);
-      } else {
+      } else if (initialOrders.length === 0) {
+        // No hay datos en localStorage ni en props → fetchear del server
         fetchOrders();
       }
     } catch {
-      fetchOrders();
+      if (initialOrders.length === 0) fetchOrders();
     }
-  }, [fetchOrders]);
+  }, [fetchOrders, initialOrders.length]);
 
   // Persistir órdenes en localStorage
   useEffect(() => {
