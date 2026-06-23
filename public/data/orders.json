@@ -13,7 +13,8 @@
       "cantidad": 1,
       "estado": "3",
       "tracking": "YT7629068973459",
-      "fecha_pedido": 1782085730
+      "fecha_pedido": 1782085730,
+      "peso_g": 0
     },
     {
       "oid": "20467955",
@@ -28,7 +29,8 @@
       "cantidad": 1,
       "estado": "3",
       "tracking": "YT7629067656500",
-      "fecha_pedido": 1782053829
+      "fecha_pedido": 1782053829,
+      "peso_g": 0
     },
     {
       "oid": "20428966",
@@ -43,7 +45,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012884440942",
-      "fecha_pedido": 1781718484
+      "fecha_pedido": 1781718484,
+      "peso_g": 0
     },
     {
       "oid": "20428891",
@@ -58,7 +61,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012876021266",
-      "fecha_pedido": 1781718009
+      "fecha_pedido": 1781718009,
+      "peso_g": 0
     },
     {
       "oid": "20428889",
@@ -73,7 +77,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012876021266",
-      "fecha_pedido": 1781718009
+      "fecha_pedido": 1781718009,
+      "peso_g": 0
     },
     {
       "oid": "20428888",
@@ -88,7 +93,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012876021266",
-      "fecha_pedido": 1781718009
+      "fecha_pedido": 1781718009,
+      "peso_g": 0
     },
     {
       "oid": "20428766",
@@ -103,7 +109,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012884440942",
-      "fecha_pedido": 1781717345
+      "fecha_pedido": 1781717345,
+      "peso_g": 0
     },
     {
       "oid": "20428765",
@@ -118,7 +125,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012884440942",
-      "fecha_pedido": 1781717345
+      "fecha_pedido": 1781717345,
+      "peso_g": 0
     },
     {
       "oid": "20428764",
@@ -133,7 +141,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79012884440942",
-      "fecha_pedido": 1781717345
+      "fecha_pedido": 1781717345,
+      "peso_g": 0
     },
     {
       "oid": "20262214",
@@ -148,7 +157,8 @@
       "cantidad": 1,
       "estado": "4",
       "tracking": "79009289027257",
-      "fecha_pedido": 1780504690
+      "fecha_pedido": 1780504690,
+      "peso_g": 0
     }
   ],
   "lastSync": "2026-06-23T15:49:19.307Z"

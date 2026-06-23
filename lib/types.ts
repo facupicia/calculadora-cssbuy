@@ -11,6 +11,7 @@ export interface CssbuyOrder {
   cantidad: number;
   estado: string;
   tracking: string;
+  peso_g: number;
   fecha_pedido: number;
 }
 

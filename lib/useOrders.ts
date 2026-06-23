@@ -73,6 +73,7 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
           cantidad: Math.max(1, Math.round(Number(o.cantidad ?? o.quantity ?? 1) || 1)),
           estado: String(o.estado ?? o.status ?? "Ordered"),
           tracking: String(o.tracking ?? o.trackingNumber ?? ""),
+          peso_g: Number(o.peso_g ?? o.weight ?? 0) || 0,
           fecha_pedido: Number(o.fecha_pedido ?? o.orderTime ?? Math.floor(Date.now() / 1000)) || Math.floor(Date.now() / 1000),
         }));
 

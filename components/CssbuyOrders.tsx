@@ -88,6 +88,7 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
                       = ¥{(order.precio_unitario_cny + order.envio_local_cny + order.envio_china_cny).toFixed(2)}
                     </span>
                   </div>
+                  {order.peso_g > 0 && <p className="text-xs text-muted-foreground">⚖️ {order.peso_g}g</p>}
                   {order.variante && <p className="text-xs text-muted-foreground truncate">{order.variante}</p>}
                   {order.tracking && <p className="text-xs text-muted-foreground font-mono">{order.tracking}</p>}
                 </div>
@@ -114,7 +115,7 @@ export default function CssbuyOrders({ orders, loading, error, onImport }: Cssbu
                     precioCNY: order.precio_unitario_cny || 0,
                     envioLocalCNY: order.envio_local_cny || 0,
                     envioChinaCNY: order.envio_china_cny || 0,
-                    pesoG: 0,
+                    pesoG: order.peso_g || 0,
                     cantidad: order.cantidad || 1,
                     precioVentaUSD: 0,
                     link: order.url || "",
