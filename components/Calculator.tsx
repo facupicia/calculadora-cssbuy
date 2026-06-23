@@ -295,7 +295,7 @@ export default function Calculator({ orders }: CalculatorProps) {
             <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <p className="text-xs text-muted-foreground mb-2">Importar desde pedidos CSSBuy:</p>
               <div className="flex flex-wrap gap-2">
-                {orders.slice(0, 5).map((o) => (
+                {orders.map((o) => (
                   <button
                     key={o.oid}
                     onClick={() => importFromOrder(o)}
