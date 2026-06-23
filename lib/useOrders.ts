@@ -2,12 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CssbuyOrder } from "./types";
-import { scrapeCssbuyOrdersFromBrowser } from "./cssbuyClientScrape";
-
-interface OrdersResponse {
-  orders: CssbuyOrder[];
-  lastSync: string | null;
-}
 
 const STORAGE_KEY = "cssbuy-orders";
 const STORAGE_SYNC_KEY = "cssbuy-last-sync";
@@ -19,23 +13,7 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/orders");
-      if (!res.ok) throw new Error("Error al cargar pedidos");
-      const data: OrdersResponse = await res.json();
-      setOrders(data.orders);
-      setLastSync(data.lastSync);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Cargar órdenes del server al montar si no hay datos en localStorage
+  // Cargar de localStorage al montar (si tiene datos más recientes)
   useEffect(() => {
     try {
       const savedOrders = localStorage.getItem(STORAGE_KEY);
@@ -43,16 +21,13 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
       if (savedOrders) {
         setOrders(JSON.parse(savedOrders));
         if (savedSync) setLastSync(savedSync);
-      } else if (initialOrders.length === 0) {
-        // No hay datos en localStorage ni en props → fetchear del server
-        fetchOrders();
       }
     } catch {
-      if (initialOrders.length === 0) fetchOrders();
+      // ignore
     }
-  }, [fetchOrders, initialOrders.length]);
+  }, []);
 
-  // Persistir órdenes en localStorage
+  // Persistir en localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
@@ -61,7 +36,6 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
     }
   }, [orders]);
 
-  // Persistir lastSync en localStorage
   useEffect(() => {
     try {
       if (lastSync) localStorage.setItem(STORAGE_SYNC_KEY, lastSync);
@@ -69,44 +43,6 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
       // ignore
     }
   }, [lastSync]);
-
-  const sync = useCallback(
-    async (cookie?: string, csrfToken?: string, mode: "server" | "browser" = "server") => {
-      setSyncing(true);
-      setError(null);
-      try {
-        let orders: CssbuyOrder[];
-        let lastSync: string;
-
-        if (mode === "browser" && cookie) {
-          // Request directo desde el navegador: evita IP binding de Vercel.
-          orders = await scrapeCssbuyOrdersFromBrowser(cookie.trim(), csrfToken?.trim() ?? "");
-          lastSync = new Date().toISOString();
-        } else {
-          const res = await fetch("/api/orders/sync", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cookie, csrfToken }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.details || data.error || "Error al sincronizar");
-          orders = data.orders;
-          lastSync = data.lastSync;
-        }
-
-        setOrders(orders);
-        setLastSync(lastSync);
-        return { orders, lastSync } as OrdersResponse;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Error desconocido";
-        setError(msg);
-        throw err;
-      } finally {
-        setSyncing(false);
-      }
-    },
-    []
-  );
 
   const importFromJson = useCallback(async (jsonText: string) => {
     setSyncing(true);
@@ -116,10 +52,13 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
       if (!trimmed) throw new Error("Pegá el JSON generado por el script");
 
       const parsed = JSON.parse(trimmed);
-      const arr = Array.isArray(parsed) ? parsed : [parsed];
-      if (arr.length === 0) throw new Error("El JSON no contiene pedidos");
+      // Acepta { orders: [...] } o array directo
+      const ordersArr = Array.isArray(parsed) ? parsed : (parsed.orders ?? [parsed]);
+      if (!Array.isArray(ordersArr) || ordersArr.length === 0) {
+        throw new Error("El JSON no contiene pedidos válidos");
+      }
 
-      const valid: CssbuyOrder[] = arr
+      const valid: CssbuyOrder[] = ordersArr
         .filter((o: any) => o && typeof o === "object")
         .map((o: any) => ({
           oid: String(o.oid ?? o.id ?? o.orderId ?? ""),
@@ -152,5 +91,10 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
     }
   }, []);
 
-  return { orders, lastSync, loading, syncing, error, fetchOrders, sync, importFromJson };
+  const importFromFile = useCallback(async (file: File) => {
+    const text = await file.text();
+    return importFromJson(text);
+  }, [importFromJson]);
+
+  return { orders, lastSync, loading, syncing, error, importFromJson, importFromFile };
 }

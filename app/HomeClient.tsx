@@ -18,7 +18,7 @@ interface HomeClientProps {
 export default function HomeClient({ initialOrders, initialLastSync }: HomeClientProps) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const { orders, lastSync, syncing, error, sync, importFromJson } = useOrders(initialOrders, initialLastSync);
+  const { orders, lastSync, syncing, error, importFromJson, importFromFile } = useOrders(initialOrders, initialLastSync);
 
   const [importedLinks, setImportedLinks] = useState<Set<string>>(new Set());
 
@@ -53,8 +53,8 @@ export default function HomeClient({ initialOrders, initialLastSync }: HomeClien
       <SyncDialog
         open={syncDialogOpen}
         onClose={() => setSyncDialogOpen(false)}
-        onSyncCookie={(cookie, csrfToken, mode) => sync(cookie, csrfToken, mode)}
         onImportJson={importFromJson}
+        onImportFile={importFromFile}
         syncing={syncing}
       />
     </div>
