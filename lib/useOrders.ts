@@ -79,6 +79,17 @@ export function useOrders(initialOrders: CssbuyOrder[] = [], initialLastSync: st
 
       if (valid.length === 0) throw new Error("No se encontraron pedidos válidos en el JSON");
 
+      // Guardar en Supabase
+      try {
+        await fetch("/api/warehouse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orders: valid }),
+        });
+      } catch {
+        // Supabase puede no estar configurado, no bloquear
+      }
+
       const stamp = new Date().toISOString();
       setOrders(valid);
       setLastSync(stamp);

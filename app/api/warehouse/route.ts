@@ -5,19 +5,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
 
-export async function GET() {
+export async function POST(req: Request) {
   try {
+    const body = await req.json();
+    const orders = Array.isArray(body?.orders) ? body.orders : Array.isArray(body) ? body : [];
+
+    if (orders.length === 0) {
+      return Response.json({ error: "No se encontraron pedidos en el JSON" }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("cssbuy_warehouse")
-      .select("*")
-      .order("fecha_pedido", { ascending: false });
+      .upsert(orders, { onConflict: "oid" })
+      .select("oid");
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
     }
 
     return Response.json({
-      orders: data,
+      success: true,
+      upserted: data?.length || 0,
       lastSync: new Date().toISOString(),
     });
   } catch (err) {
