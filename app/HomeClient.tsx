@@ -21,6 +21,7 @@ export default function HomeClient({ initialOrders, initialLastSync }: HomeClien
   const { orders, lastSync, syncing, error, importFromJson, importFromFile } = useOrders(initialOrders, initialLastSync);
 
   const [importedLinks, setImportedLinks] = useState<Set<string>>(new Set());
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
 
   const handleImport = (product: Product) => {
     if (importedLinks.has(product.link)) {
@@ -28,6 +29,7 @@ export default function HomeClient({ initialOrders, initialLastSync }: HomeClien
       return;
     }
     setImportedLinks((prev) => new Set(prev).add(product.link));
+    setPendingProduct(product);
     setActiveTab("calculator");
   };
 
@@ -43,7 +45,7 @@ export default function HomeClient({ initialOrders, initialLastSync }: HomeClien
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === "dashboard" && <Dashboard orders={orders} />}
-        {activeTab === "calculator" && <Calculator orders={orders} />}
+        {activeTab === "calculator" && <Calculator orders={orders} pendingProduct={pendingProduct} onConsumed={() => setPendingProduct(null)} />}
         {activeTab === "orders" && (
           <CssbuyOrders orders={orders} loading={false} error={error} onImport={handleImport} />
         )}

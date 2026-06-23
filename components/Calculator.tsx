@@ -21,9 +21,11 @@ import { CssbuyOrder } from "@/lib/types";
 
 interface CalculatorProps {
   orders: CssbuyOrder[];
+  pendingProduct?: Product | null;
+  onConsumed?: () => void;
 }
 
-export default function Calculator({ orders }: CalculatorProps) {
+export default function Calculator({ orders, pendingProduct, onConsumed }: CalculatorProps) {
   const [fx, setFx] = useState<FxRates>({ blue: 0, oficial: 0, mep: 0, cny: 7.2 });
   const [envio, setEnvio] = useState<ShipmentCosts>({
     freightCNY: 0,
@@ -43,6 +45,13 @@ export default function Calculator({ orders }: CalculatorProps) {
     valorDeclaradoUSD: null,
   });
   const [productos, setProductos] = useState<Product[]>([]);
+
+  // Agregar producto importado automáticamente
+  if (pendingProduct && onConsumed) {
+    setProductos((prev) => [...prev, pendingProduct]);
+    onConsumed();
+  }
+
   const [nombreEnvio, setNombreEnvio] = useState("");
   const [cotizaciones, setCotizaciones] = useState<any[]>(() => {
     try {
