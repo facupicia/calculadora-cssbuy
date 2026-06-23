@@ -35,8 +35,10 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
     platformFee: 0.35,
     markup: 2.0,
   });
-  const [lineaEnvio, setLineaEnvio] = useState<string>("custom");
+  const [lineaEnvio, setLineaEnvio] = useState<string>("chinapost-sal");
   const [tarifaPorGramo, setTarifaPorGramo] = useState<number>(0);
+  const [empaque, setEmpaque] = useState<"bag" | "box">("bag");
+  const [cupon100, setCupon100] = useState(false);
   const [aduana, setAduana] = useState<AduanaConfig>({
     dentroFranquicia: false,
     enviosAnio: 0,
@@ -64,10 +66,35 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
   const resultados = useMemo(() => calcularTodo(productos, fx, envio, aduana), [productos, fx, envio, aduana]);
 
   const pesoTotalG = productos.reduce((s, p) => s + (p.pesoG || 0) * (p.cantidad || 1), 0);
-  const freightCalculado = Math.round(pesoTotalG * tarifaPorGramo);
 
-  if (lineaEnvio !== "custom" && pesoTotalG > 0 && freightCalculado !== envio.freightCNY) {
-    setEnvio((prev) => ({ ...prev, freightCNY: freightCalculado }));
+  // Empaque: bolsa no suma peso (hasta 5999g). Caja suma ~400g de cartón/protección.
+  const pesoFacturadoG = useMemo(() => {
+    if (empaque === "box" && pesoTotalG > 5999) {
+      return pesoTotalG + 400;
+    }
+    return pesoTotalG;
+  }, [pesoTotalG, empaque]);
+
+  const freightCalculado = useMemo(() => {
+    if (lineaEnvio === "chinapost-sal") {
+      // China Post SAL 15 días - Pure Weight
+      // First weight: USD 25.85 / 1000g, Added weight: USD 10.78 / 1000g
+      // CSSBuy cobra por kg completo (redondeo hacia arriba)
+      const firstUSD = 25.85;
+      const addedUSD = 10.78;
+      const totalKg = Math.ceil(pesoFacturadoG / 1000);
+      const freightUSD = firstUSD + Math.max(0, totalKg - 1) * addedUSD;
+      return Math.round(freightUSD * fx.cny);
+    }
+    return Math.round(pesoFacturadoG * tarifaPorGramo);
+  }, [pesoFacturadoG, lineaEnvio, tarifaPorGramo, fx.cny]);
+
+  // Cupón 500/100 yuanes: descuento de 100 yuanes si el freight supera 500 yuanes.
+  const descuentoCuponCNY = cupon100 && freightCalculado >= 500 ? 100 : 0;
+  const freightConDescuentoCNY = Math.max(0, freightCalculado - descuentoCuponCNY);
+
+  if (lineaEnvio !== "custom" && pesoTotalG > 0 && freightConDescuentoCNY !== envio.freightCNY) {
+    setEnvio((prev) => ({ ...prev, freightCNY: freightConDescuentoCNY }));
   }
 
   const addProducto = useCallback(() => {
@@ -108,7 +135,7 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
           precioCNY: order.precio_unitario_cny || 0,
           envioLocalCNY: order.envio_local_cny || 0,
           envioChinaCNY: order.envio_china_cny || 0,
-          pesoG: 0,
+          pesoG: order.peso_g || 0,
           cantidad: order.cantidad || 1,
           precioVentaUSD: 0,
           link: order.url || "",
@@ -445,7 +472,10 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
             <h3 className="text-sm font-semibold">Envío CSSBuy</h3>
             {pesoTotalG > 0 && (
               <span className="ml-auto text-xs text-muted-foreground">
-                Peso total: <span className="text-foreground font-medium">{pesoTotalG}g</span>
+                Peso neto: <span className="text-foreground font-medium">{pesoTotalG}g</span>
+                {pesoFacturadoG !== pesoTotalG && (
+                  <span className="text-warning"> / facturado {pesoFacturadoG}g</span>
+                )}
               </span>
             )}
           </div>
@@ -453,7 +483,7 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
           {/* Calculador de Freight */}
           <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
             <p className="text-xs font-medium text-primary mb-2">Calculador de Freight (auto)</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Línea de envío</label>
                 <select
@@ -463,6 +493,7 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
                     setLineaEnvio(val);
                     const tarifas: Record<string, number> = {
                       custom: 0,
+                      "chinapost-sal": 0,
                       ems: 0.09,
                       dhl: 0.16,
                       fedex: 0.15,
@@ -474,6 +505,7 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
                   }}
                   className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
+                  <option value="chinapost-sal">China Post SAL 15 días (Pure Weight)</option>
                   <option value="custom">Manual (sin auto)</option>
                   <option value="ems">EMS (~0.09 ¥/g)</option>
                   <option value="dhl">DHL (~0.16 ¥/g)</option>
@@ -481,6 +513,17 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
                   <option value="ups">UPS (~0.14 ¥/g)</option>
                   <option value="chinapost">China Post (~0.06 ¥/g)</option>
                   <option value="eub">EUB / ePacket (~0.08 ¥/g)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Empaque</label>
+                <select
+                  value={empaque}
+                  onChange={(e) => setEmpaque(e.target.value as "bag" | "box")}
+                  className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="bag">Bolsa / Simple Packaging</option>
+                  <option value="box">Caja (+400g si pasa 5999g)</option>
                 </select>
               </div>
               <div>
@@ -519,7 +562,41 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
                 </div>
               </div>
             </div>
-            {lineaEnvio !== "custom" && pesoTotalG > 0 && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                id="cupon100"
+                type="checkbox"
+                checked={cupon100}
+                onChange={(e) => setCupon100(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <label htmlFor="cupon100" className="text-xs text-muted-foreground cursor-pointer">
+                Aplicar cupón 500/100 yuanes (-¥100 si freight ≥ ¥500)
+              </label>
+            </div>
+            {lineaEnvio === "chinapost-sal" && pesoTotalG > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {pesoFacturadoG <= 1000 ? (
+                  <>
+                    Primeros 1000g = <span className="text-emerald-400 font-medium">USD 25.85</span>
+                  </>
+                ) : (
+                  <>
+                    {pesoTotalG}g{pesoFacturadoG !== pesoTotalG && <> facturado como {pesoFacturadoG}g</>} redondeado a{" "}
+                    {Math.ceil(pesoFacturadoG / 1000)}kg: USD 25.85 +{" "}
+                    {Math.max(0, Math.ceil(pesoFacturadoG / 1000) - 1)} × USD 10.78 ={" "}
+                    <span className="text-emerald-400 font-medium">¥{freightCalculado}</span>
+                    {descuentoCuponCNY > 0 && (
+                      <>
+                        {" "}- ¥{descuentoCuponCNY} cupón ={" "}
+                        <span className="text-emerald-400 font-medium">¥{freightConDescuentoCNY}</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </p>
+            )}
+            {lineaEnvio !== "custom" && lineaEnvio !== "chinapost-sal" && pesoTotalG > 0 && (
               <p className="text-xs text-muted-foreground mt-2">
                 {pesoTotalG}g × {tarifaPorGramo.toFixed(3)} ¥/g ={" "}
                 <span className="text-emerald-400 font-medium">¥{freightCalculado}</span>
@@ -665,6 +742,8 @@ export default function Calculator({ orders, pendingProduct, onConsumed }: Calcu
 function ResultsPanel({ resultados, platformFee }: { resultados: CalculationResult; platformFee: number }) {
   const r = resultados;
   const dolarVenta = r.costoPaqueteARS / (r.costoPaqueteUSD || 1);
+  const kgNeto = r.pesoTotalG / 1000;
+  const freightPorKg = kgNeto > 0 ? (r.freightUSD + r.serviceUSD) / kgNeto : 0;
 
   if (r.productosCalc.length === 0 || r.productosUSDTotal === 0) {
     return (
@@ -704,6 +783,7 @@ function ResultsPanel({ resultados, platformFee }: { resultados: CalculationResu
         <div className="space-y-2 text-sm">
           <Row label="Productos (FOB)" value={fmtUSD(r.productosUSDTotal)} />
           <Row label="Freight + service" value={fmtUSD(r.freightUSD + r.serviceUSD)} />
+          {r.pesoTotalG > 0 && <Row label={`Freight por kg neto (${kgNeto.toFixed(2)} kg)`} value={fmtUSD(freightPorKg)} />}
           <Row
             label={`Recarga fee (${((r.recargaFee / (r.productosUSDTotal + r.freightUSD + r.serviceUSD)) * 100).toFixed(
               0
