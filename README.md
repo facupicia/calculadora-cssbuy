@@ -51,6 +51,8 @@ npm run build
 3. Pegá la cookie en el diálogo y confirmá.
 
 > **Importante:** la cookie no se guarda en el servidor. Se usa solo para la sincronización y se descarta después.
+>
+> CSSBuy usa Laravel, por lo que también necesitás copiar el header `X-CSRF-Token` del request real en DevTools.
 
 ## Configurar el scraper
 
@@ -64,11 +66,52 @@ El scraper está en `app/api/orders/sync/route.ts`. Para que funcione con CSSBuy
 const res = await fetch("https://www.cssbuy.com/api/order/list?status=Ordered", {
   headers: {
     Cookie: cookie,
+    "X-CSRF-Token": csrfToken,
     "User-Agent": "Mozilla/5.0 ...",
     Accept: "application/json",
   },
 });
 ```
+
+### Modos de sincronización
+
+- **Por servidor**: la cookie y el CSRF token se envían a la API Route de Next.js y el request sale desde Vercel. Puede fallar si CSSBuy valida la IP de origen.
+- **Desde navegador**: el request sale directamente desde tu Chrome, con tu IP real. Es el método más fiable si hay validación de IP, pero puede ser bloqueado por CORS.
+- **Script local**: corre un scraper en tu PC (`scripts/scrape-cssbuy.mjs`). El request sale con tu IP real y guarda los pedidos en `public/data/orders.json`.
+- **Script consola**: fallback manual. Corré el script en la consola de cssbuy.com y pegá el JSON.
+
+## Scraper local (recomendado si hay IP binding)
+
+Si CSSBuy rechaza la cookie en Vercel por validación de IP, podés correr el scraper directamente en tu PC.
+
+La forma más cómoda es crear un archivo `.env.local` en la raíz del proyecto:
+
+```env
+CSSBUY_COOKIE=lang=en; laravel_session=...
+CSSBUY_CSRF=ctr4GvKRVCLqqMAOs8QXMU0b5LAcwTCPeGYbCd15
+```
+
+Después solo corrés:
+
+```bash
+node scripts/scrape-cssbuy.mjs
+```
+
+También podés usar argumentos:
+
+```bash
+node scripts/scrape-cssbuy.mjs \
+  --cookie "lang=en; laravel_session=..." \
+  --csrf "ctr4GvKRVCLqqMAOs8QXMU0b5LAcwTCPeGYbCd15"
+```
+
+O variables de entorno:
+
+```bash
+CSSBUY_COOKIE="..." CSSBUY_CSRF="..." node scripts/scrape-cssbuy.mjs
+```
+
+Esto guarda los pedidos en `public/data/orders.json`. Después corrés `npm run dev` y la app los levanta automáticamente.
 
 ## Datos estáticos
 

@@ -81,7 +81,7 @@ interface CssbuyApiItem {
 
 export async function POST(req: NextRequest) {
   try {
-    const { cookie } = (await req.json()) as { cookie?: string };
+    const { cookie, csrfToken } = (await req.json()) as { cookie?: string; csrfToken?: string };
 
     if (!cookie || !cookie.trim()) {
       return NextResponse.json({ error: "Falta la cookie de sesión" }, { status: 400 });
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    const orders = await scrapeCssbuyOrders(cookie.trim(), clientIp);
+    const orders = await scrapeCssbuyOrders(cookie.trim(), csrfToken?.trim(), clientIp);
 
     const lastSync = new Date().toISOString();
 
@@ -134,44 +134,71 @@ function filterCookies(raw: string): string {
     .join("; ");
 }
 
-async function scrapeCssbuyOrders(cookie: string, clientIp: string): Promise<CssbuyOrder[]> {
+async function scrapeCssbuyOrders(
+  cookie: string,
+  csrfToken: string | undefined,
+  clientIp: string
+): Promise<CssbuyOrder[]> {
   const filteredCookie = filterCookies(cookie);
   const allOrders: CssbuyOrder[] = [];
   let page = 1;
   let hasMore = true;
 
   while (hasMore) {
-    const tryQueries = ["inchina", ""];
+    // Intento 1: body exacto que usa el navegador (query=&inchina=)
+    // Intento 2: variantes legacy por si el endpoint espera query=inchina
+    const tryBodies = [
+      { query: "", inchina: "" },
+      { query: "inchina", inchina: "" },
+      { query: "", inchina: "1" },
+    ];
     let lastData: unknown = null;
     let list: unknown[] | null = null;
-    let usedQuery = tryQueries[0];
+    let usedBody = tryBodies[0];
 
-    for (const query of tryQueries) {
+    for (const bodyParams of tryBodies) {
       const params = new URLSearchParams();
       params.set("orderState", "all");
       params.set("starttime", "");
       params.set("endtime", "");
       params.set("pageSize", String(PAGE_SIZE));
       params.set("pageNum", String(page));
-      params.set("query", query);
+      params.set("query", bodyParams.query);
+      params.set("inchina", bodyParams.inchina);
+
+      const headers: Record<string, string> = {
+        Cookie: filteredCookie,
+        "User-Agent": USER_AGENT,
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "es-ES,es;q=0.9,zh-CN;q=0.8,zh;q=0.7,en;q=0.6",
+        Referer: "https://www.cssbuy.com/web/order?type=all",
+        Origin: "https://www.cssbuy.com",
+        "X-Forwarded-For": clientIp,
+        "X-Real-IP": clientIp,
+        "X-Requested-With": "XMLHttpRequest",
+        "sec-ch-ua":
+          '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "Windows",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        Pragma: "no-cache",
+        "Cache-Control": "no-cache",
+        Priority: "u=1, i",
+      };
+
+      if (csrfToken) {
+        headers["X-CSRF-Token"] = csrfToken;
+      }
 
       let res: Response;
       try {
         res = await fetch(CSSBUY_API, {
           method: "POST",
           redirect: "manual",
-          headers: {
-            Cookie: filteredCookie,
-            "User-Agent": USER_AGENT,
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            Accept: "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
-            Referer: "https://www.cssbuy.com/web/order?type=all",
-            Origin: "https://www.cssbuy.com",
-            "X-Forwarded-For": clientIp,
-            "X-Real-IP": clientIp,
-            "X-Requested-With": "XMLHttpRequest",
-          },
+          headers,
           body: params.toString(),
         });
       } catch (err) {
@@ -187,6 +214,12 @@ async function scrapeCssbuyOrders(cookie: string, clientIp: string): Promise<Css
       if (res.status === 401 || res.status === 403) {
         throw new Error(
           "CSSBuy rechazó la cookie (401/403). Probablemente la sesión esté atada a tu IP."
+        );
+      }
+
+      if (res.status === 419) {
+        throw new Error(
+          "CSSBuy pide el token CSRF (419). Copiá el valor del header X-CSRF-Token desde DevTools y pegalo junto a la cookie."
         );
       }
 
@@ -213,14 +246,14 @@ async function scrapeCssbuyOrders(cookie: string, clientIp: string): Promise<Css
       const extracted = extractList(data);
       if (Array.isArray(extracted) && extracted.length > 0) {
         list = extracted;
-        usedQuery = query;
+        usedBody = bodyParams;
         break;
       }
     }
 
     if (page === 1) {
       console.log("CSSBuy respuesta pagina 1:", lastData);
-      console.log("CSSBuy query usado:", usedQuery);
+      console.log("CSSBuy body usado:", usedBody);
     }
 
     if (!Array.isArray(list)) {

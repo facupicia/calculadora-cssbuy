@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CssbuyOrder } from "./types";
+import { scrapeCssbuyOrdersFromBrowser } from "./cssbuyClientScrape";
 
 interface OrdersResponse {
   orders: CssbuyOrder[];
@@ -61,28 +62,43 @@ export function useOrders() {
     }
   }, []);
 
-  const sync = useCallback(async (cookie?: string) => {
-    setSyncing(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/orders/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cookie }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.details || data.error || "Error al sincronizar");
-      setOrders(data.orders);
-      setLastSync(data.lastSync);
-      return data as OrdersResponse;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      setError(msg);
-      throw err;
-    } finally {
-      setSyncing(false);
-    }
-  }, []);
+  const sync = useCallback(
+    async (cookie?: string, csrfToken?: string, mode: "server" | "browser" = "server") => {
+      setSyncing(true);
+      setError(null);
+      try {
+        let orders: CssbuyOrder[];
+        let lastSync: string;
+
+        if (mode === "browser" && cookie) {
+          // Request directo desde el navegador: evita IP binding de Vercel.
+          orders = await scrapeCssbuyOrdersFromBrowser(cookie.trim(), csrfToken?.trim() ?? "");
+          lastSync = new Date().toISOString();
+        } else {
+          const res = await fetch("/api/orders/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cookie, csrfToken }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.details || data.error || "Error al sincronizar");
+          orders = data.orders;
+          lastSync = data.lastSync;
+        }
+
+        setOrders(orders);
+        setLastSync(lastSync);
+        return { orders, lastSync } as OrdersResponse;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error desconocido";
+        setError(msg);
+        throw err;
+      } finally {
+        setSyncing(false);
+      }
+    },
+    []
+  );
 
   const importFromJson = useCallback(async (jsonText: string) => {
     setSyncing(true);

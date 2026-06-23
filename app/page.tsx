@@ -48,7 +48,7 @@ export default function Home() {
       <SyncDialog
         open={syncDialogOpen}
         onClose={() => setSyncDialogOpen(false)}
-        onSyncCookie={sync}
+        onSyncCookie={(cookie, csrfToken, mode) => sync(cookie, csrfToken, mode)}
         onImportJson={importFromJson}
         syncing={syncing}
       />
