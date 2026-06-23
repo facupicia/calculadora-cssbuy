@@ -19,38 +19,6 @@ export function useOrders() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      const savedOrders = localStorage.getItem(STORAGE_KEY);
-      const savedSync = localStorage.getItem(STORAGE_SYNC_KEY);
-      if (savedOrders) {
-        setOrders(JSON.parse(savedOrders));
-        if (savedSync) setLastSync(savedSync);
-      } else {
-        // No hay datos en localStorage, cargar del server
-        fetchOrders();
-      }
-    } catch {
-      // ignore
-    }
-  }, [fetchOrders]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-    } catch {
-      // ignore
-    }
-  }, [orders]);
-
-  useEffect(() => {
-    try {
-      if (lastSync) localStorage.setItem(STORAGE_SYNC_KEY, lastSync);
-    } catch {
-      // ignore
-    }
-  }, [lastSync]);
-
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -66,6 +34,40 @@ export function useOrders() {
       setLoading(false);
     }
   }, []);
+
+  // Cargar órdenes del server al montar si no hay datos en localStorage
+  useEffect(() => {
+    try {
+      const savedOrders = localStorage.getItem(STORAGE_KEY);
+      const savedSync = localStorage.getItem(STORAGE_SYNC_KEY);
+      if (savedOrders) {
+        setOrders(JSON.parse(savedOrders));
+        if (savedSync) setLastSync(savedSync);
+      } else {
+        fetchOrders();
+      }
+    } catch {
+      fetchOrders();
+    }
+  }, [fetchOrders]);
+
+  // Persistir órdenes en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+    } catch {
+      // ignore
+    }
+  }, [orders]);
+
+  // Persistir lastSync en localStorage
+  useEffect(() => {
+    try {
+      if (lastSync) localStorage.setItem(STORAGE_SYNC_KEY, lastSync);
+    } catch {
+      // ignore
+    }
+  }, [lastSync]);
 
   const sync = useCallback(
     async (cookie?: string, csrfToken?: string, mode: "server" | "browser" = "server") => {
